@@ -1,122 +1,18 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'package:location/location.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:driver/map.dart';
 
 class MyHomePage extends StatefulWidget {
-  final String title;
-  MyHomePage({this.title});
+  MyHomePage();
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  static const double CAMERA_ZOOM = 16;
-  static const double CAMERA_TILT = 80;
-  static const double CAMERA_BEARING = 30;
-  static const String k_googleAPIKey =
-      'AIzaSyAcFr4okH0wWB4sCNFDWOEiT86PjD_fncM';
-  static const LatLng SOURCE_LOCATION = LatLng(42.747932, -71.167889);
-  static const LatLng DEST_LOCATION = LatLng(37.335685, -122.0605916);
-
   TextEditingController _startPositionLat = TextEditingController();
   TextEditingController _startPositionLong = TextEditingController();
   TextEditingController _endPositionLat = TextEditingController();
   TextEditingController _endPositionLong = TextEditingController();
-
-  Completer<GoogleMapController> _controller = Completer();
-  Set<Marker> _markers = Set<Marker>();
-// for my drawn routes on the map
-  Set<Polyline> _polylines = Set<Polyline>();
-  List<LatLng> polylineCoordinates = [];
-  PolylinePoints polylinePoints;
-// for my custom marker pins
-  BitmapDescriptor sourceIcon;
-  BitmapDescriptor destinationIcon;
-// the user's initial location and current location
-// as it moves
-  LocationData currentLocation;
-// a reference to the destination location
-  LocationData destinationLocation;
-// wrapper around the location API
-  Location location;
   bool _useCurrentLocation = false;
-
-  @override
-  void initState() {
-    // TODO: implement initState
-
-    super.initState();
-
-    // create an instance of Location
-    // subscribe to changes in the user's location
-    // by "listening" to the location's onLocationChanged event
-    location = new Location();
-    polylinePoints = PolylinePoints();
-    location.onLocationChanged.listen((event) {
-      // event contains the lat and long of the
-      // current user's position in real time,
-      // so we're holding on to it
-      currentLocation = event;
-    });
-    updatePinOnMap();
-
-    // set custom marker pins
-    setSourceAndDestinationIcons();
-    // set the initial location
-    setInitialLocation();
-  }
-
-  void setSourceAndDestinationIcons() async {
-    sourceIcon = await BitmapDescriptor.fromAssetImage(
-        ImageConfiguration(devicePixelRatio: 2.5), 'assets/driving_pin.png');
-
-    destinationIcon = await BitmapDescriptor.fromAssetImage(
-        ImageConfiguration(devicePixelRatio: 2.5),
-        'assets/destination_map_marker.png');
-  }
-
-  void setInitialLocation() async {
-    // set the initial location by pulling the user's
-    // current location from the location's getLocation()
-    currentLocation = await location.getLocation();
-
-    // hard-coded destination for this example
-    destinationLocation = LocationData.fromMap({
-      "latitude": DEST_LOCATION.latitude,
-      "longitude": DEST_LOCATION.longitude
-    });
-  }
-
-  void updatePinOnMap() async {
-    // create a new CameraPosition instance
-    // every time the location changes, so the camera
-    // follows the pin as it moves with an animation
-    CameraPosition cPosition = CameraPosition(
-      zoom: CAMERA_ZOOM,
-      tilt: CAMERA_TILT,
-      bearing: CAMERA_BEARING,
-      target: LatLng(currentLocation.latitude, currentLocation.longitude),
-    );
-    final GoogleMapController controller = await _controller.future;
-    controller.animateCamera(CameraUpdate.newCameraPosition(cPosition));
-    // do this inside the setState() so Flutter gets notified
-    // that a widget update is due
-    setState(() {
-      // updated position
-      var pinPosition =
-          LatLng(currentLocation.latitude, currentLocation.longitude);
-
-      // the trick is to remove the marker (by id)
-      // and add it again at the updated location
-      _markers.removeWhere((m) => m.markerId.value == 'sourcePin');
-      _markers.add(Marker(
-          markerId: MarkerId('sourcePin'),
-          position: pinPosition, // updated position
-          icon: sourceIcon));
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +94,64 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ],
           ),
+          SizedBox(height: 70),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              InkWell(
+                  onTap: () {
+                    double fromLat;
+                    double fromLong;
+                    try {
+                      if (!_useCurrentLocation) {
+                        fromLat = double.parse(_startPositionLat.text);
+                        fromLong = double.parse(_startPositionLong.text);
+                      } else {
+                        fromLat = 0.0;
+                        fromLong = 0.0;
+                      }
+                      double toLat = double.parse(_endPositionLat.text);
+                      double toLong = double.parse(_startPositionLat.text);
+                      if (_useCurrentLocation && (toLat == 0 || toLong == 0)) {
+                        AlertDialog(
+                            title: Text(
+                                "Please ensure to lat and to long values are non zero values"));
+                      } else if (toLat == 0 ||
+                          toLong == 0 ||
+                          fromLat == 0 ||
+                          fromLong == 0) {
+                        AlertDialog(
+                            title: Text(
+                                "Please ensure lat and long values are non zero values"));
+                      }
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => MapScreen(
+                                  fromLat: fromLat,
+                                  fromLong: fromLong,
+                                  toLat: toLat,
+                                  toLong: toLong,
+                                  useMyLocation: _useCurrentLocation)));
+                    } catch (e) {
+                      AlertDialog(
+                          title: Text(
+                              "Please ensure lat, long values are double"));
+                      print(e);
+                    }
+                  },
+                  child: Container(
+                      decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.black, width: 1)),
+                      width: 200,
+                      height: 50,
+                      child: Center(
+                          child: Text("Show Map",
+                              style: TextStyle(fontSize: 24))))),
+            ],
+          )
         ]),
       ),
     );
