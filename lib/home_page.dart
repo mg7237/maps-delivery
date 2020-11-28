@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:driver/map.dart';
+import 'package:flutter_google_places/flutter_google_places.dart';
+import 'package:google_maps_webservice/places.dart';
+import 'package:driver/constant.dart';
 
 class MyHomePage extends StatefulWidget {
   MyHomePage();
@@ -8,11 +11,12 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  TextEditingController _startPositionLat = TextEditingController();
-  TextEditingController _startPositionLong = TextEditingController();
   TextEditingController _endPositionLat = TextEditingController();
   TextEditingController _endPositionLong = TextEditingController();
-  bool _useCurrentLocation = false;
+  bool _validateLat = true;
+  bool _validateLong = true;
+  double toLat;
+  double toLong;
 
   @override
   Widget build(BuildContext context) {
@@ -21,59 +25,9 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Padding(
         padding: const EdgeInsets.all(10.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                "Start Location",
-                style: TextStyle(fontSize: 18),
-              ),
-              Row(
-                children: [
-                  Text(
-                    "Use My Current Location",
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  Switch(
-                      onChanged: (value) {
-                        _useCurrentLocation = value;
-                        if (value) {
-                          _startPositionLat.clear();
-                          _startPositionLong.clear();
-                        }
-                        setState(() {});
-                      },
-                      value: _useCurrentLocation),
-                ],
-              ),
-            ],
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 150,
-                child: TextField(
-                  enabled: !_useCurrentLocation,
-                  controller: _startPositionLat,
-                  decoration: InputDecoration(hintText: "Lat"),
-                ),
-              ),
-              Container(
-                width: 150,
-                child: TextField(
-                  enabled: !_useCurrentLocation,
-                  controller: _startPositionLong,
-                  decoration: InputDecoration(hintText: "Long"),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 30),
           Text(
-            "End Location",
-            style: TextStyle(fontSize: 18),
+            "Option 1 - Use Lat and Long",
+            style: TextStyle(fontSize: 24),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -82,50 +36,47 @@ class _MyHomePageState extends State<MyHomePage> {
                 width: 150,
                 child: TextField(
                   controller: _endPositionLat,
-                  decoration: InputDecoration(hintText: "Lat"),
+                  decoration: InputDecoration(
+                    hintText: "Lat",
+                    errorText:
+                        !_validateLat ? 'Please enter double value' : null,
+                  ),
                 ),
               ),
               Container(
                 width: 150,
                 child: TextField(
                   controller: _endPositionLong,
-                  decoration: InputDecoration(hintText: "Long"),
+                  decoration: InputDecoration(
+                    hintText: "Long",
+                    errorText:
+                        !_validateLong ? 'Please enter double value' : null,
+                  ),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 70),
+          SizedBox(height: 30),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               InkWell(
                   onTap: () {
-                    double fromLat;
-                    double fromLong;
                     try {
-                      // if (!_useCurrentLocation) {
-                      //   fromLat = double.parse(_startPositionLat.text);
-                      //   fromLong = double.parse(_startPositionLong.text);
-                      // } else {
-                      //   fromLat = 0.0;
-                      //   fromLong = 0.0;
-                      // }
-                      double toLat =
-                          12.96006; //double.parse(_endPositionLat.text);
-                      double toLong =
-                          77.75122; // double.parse(_endPositionLong.text);
-                      // if (_useCurrentLocation && (toLat == 0 || toLong == 0)) {
-                      //   AlertDialog(
-                      //       title: Text(
-                      //           "Please ensure to lat and to long values are non zero values"));
-                      // } else if (toLat == 0 ||
-                      //     toLong == 0 ||
-                      //     fromLat == 0 ||
-                      //     fromLong == 0) {
-                      //   AlertDialog(
-                      //       title: Text(
-                      //           "Please ensure lat and long values are non zero values"));
-                      // }
+                      toLat = double.parse(_endPositionLat.text);
+                      _validateLat = true;
+                    } catch (e) {
+                      _validateLat = false;
+                      print(e);
+                    }
+                    try {
+                      toLong = double.parse(_endPositionLong.text);
+                      _validateLong = true;
+                    } catch (e) {
+                      _validateLong = false;
+                      print(e);
+                    }
+                    if (_validateLat && _validateLong) {
                       Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -133,11 +84,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     toLat: toLat,
                                     toLong: toLong,
                                   )));
-                    } catch (e) {
-                      AlertDialog(
-                          title: Text(
-                              "Please ensure lat, long values are double"));
-                      print(e);
                     }
                   },
                   child: Container(
@@ -151,7 +97,63 @@ class _MyHomePageState extends State<MyHomePage> {
                           child: Text("Show Map",
                               style: TextStyle(fontSize: 24))))),
             ],
-          )
+          ),
+          SizedBox(height: 50),
+          Text(
+            "Option 2 - Use auto suggest",
+            style: TextStyle(fontSize: 24),
+          ),
+          SizedBox(height: 30),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              InkWell(
+                  onTap: () async {
+                    Prediction prediction = await PlacesAutocomplete.show(
+                        context: context,
+                        apiKey: k_googleAPIKey,
+                        mode: Mode.overlay, // Mode.overlay
+                        language: "en", // Hardcoded language Locale
+                        components: [
+                          Component(Component.country, "in")
+                        ]); // Hardcoded India region for places filter
+
+                    if (prediction != null) {
+                      GoogleMapsPlaces _places = new GoogleMapsPlaces(
+                          apiKey: k_googleAPIKey); //Same API_KEY as above
+                      PlacesDetailsResponse detail =
+                          await _places.getDetailsByPlaceId(prediction.placeId);
+                      double toLat = detail.result.geometry.location.lat;
+                      double toLong = detail.result.geometry.location.lng;
+
+                      ///String address = prediction.description;
+
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => MapScreen(
+                                    toLat: toLat,
+                                    toLong: toLong,
+                                  )));
+                    }
+                  },
+                  child: Container(
+                      decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.black, width: 1)),
+                      width: 200,
+                      height: 50,
+                      child: Center(
+                          child: Text("Show Map",
+                              style: TextStyle(fontSize: 24))))),
+            ],
+          ),
+          SizedBox(height: 50),
+          Text(
+            "Note: You can also click on the map to change destination location",
+            style: TextStyle(fontSize: 18),
+          ),
         ]),
       ),
     );

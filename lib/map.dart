@@ -94,11 +94,16 @@ class _MapScreenState extends State<MapScreen> {
         'assets/destination_map_marker.png');
   }
 
-  void showPinsOnMap() {
+  void showPinsOnMap() async {
     // get a LatLng for the source location
     // from the LocationData currentLocation object
+
+    if (currentLocation == null || destinationLocation == null) {
+      await new Future.delayed(const Duration(seconds: 1));
+    }
     var pinPosition =
         LatLng(currentLocation.latitude, currentLocation.longitude);
+
     // get a LatLng out of the LocationData object
     var destPosition =
         LatLng(destinationLocation.latitude, destinationLocation.longitude);
@@ -117,7 +122,14 @@ class _MapScreenState extends State<MapScreen> {
     setPolylines();
   }
 
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+  }
+
   void setPolylines() async {
+    polylineCoordinates = [];
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
         k_googleAPIKey,
         PointLatLng(
@@ -131,6 +143,9 @@ class _MapScreenState extends State<MapScreen> {
       result.points.forEach((PointLatLng point) {
         polylineCoordinates.add(LatLng(point.latitude, point.longitude));
       });
+      if (!this.mounted) {
+        return;
+      }
       setState(() {
         PolylineId id = PolylineId("poly");
         Polyline polyline = Polyline(
@@ -157,8 +172,13 @@ class _MapScreenState extends State<MapScreen> {
     );
     final GoogleMapController controller = await _controller.future;
 
+    if (!this.mounted) {
+      return;
+    }
+
     // do this inside the setState() so Flutter gets notified
     // that a widget update is due
+
     setState(() {
       controller.animateCamera(CameraUpdate.newCameraPosition(cPosition));
       // updated position
@@ -202,6 +222,18 @@ class _MapScreenState extends State<MapScreen> {
               polylines: Set<Polyline>.of(_polylines.values),
               mapType: MapType.normal,
               initialCameraPosition: initialCameraPosition,
+              onTap: (latLong) {
+                _markers.removeWhere((m) => m.markerId.value == 'destPin');
+                _markers.add(Marker(
+                    markerId: MarkerId('destPin'),
+                    position: latLong, // updated position
+                    icon: destinationIcon));
+                destinationLocation = LocationData.fromMap({
+                  "latitude": latLong.latitude,
+                  "longitude": latLong.longitude
+                });
+                setPolylines();
+              },
               onMapCreated: (GoogleMapController controller) {
                 _controller.complete(controller);
                 // my map has completed being created;
