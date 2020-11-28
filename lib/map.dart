@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:location/location.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:driver/constant.dart';
 
 class MapScreen extends StatefulWidget {
   final double fromLat;
@@ -27,9 +28,6 @@ class _MapScreenState extends State<MapScreen> {
   static const double CAMERA_BEARING = 30;
   LatLng destLocation;
   LatLng sourceLocation;
-
-  static const String k_googleAPIKey =
-      'AIzaSyAcFr4okH0wWB4sCNFDWOEiT86PjD_fncM';
 
   Completer<GoogleMapController> _controller = Completer();
   Set<Marker> _markers = Set<Marker>();
