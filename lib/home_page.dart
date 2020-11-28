@@ -103,36 +103,36 @@ class _MyHomePageState extends State<MyHomePage> {
                     double fromLat;
                     double fromLong;
                     try {
-                      if (!_useCurrentLocation) {
-                        fromLat = double.parse(_startPositionLat.text);
-                        fromLong = double.parse(_startPositionLong.text);
-                      } else {
-                        fromLat = 0.0;
-                        fromLong = 0.0;
-                      }
-                      double toLat = double.parse(_endPositionLat.text);
-                      double toLong = double.parse(_startPositionLat.text);
-                      if (_useCurrentLocation && (toLat == 0 || toLong == 0)) {
-                        AlertDialog(
-                            title: Text(
-                                "Please ensure to lat and to long values are non zero values"));
-                      } else if (toLat == 0 ||
-                          toLong == 0 ||
-                          fromLat == 0 ||
-                          fromLong == 0) {
-                        AlertDialog(
-                            title: Text(
-                                "Please ensure lat and long values are non zero values"));
-                      }
+                      // if (!_useCurrentLocation) {
+                      //   fromLat = double.parse(_startPositionLat.text);
+                      //   fromLong = double.parse(_startPositionLong.text);
+                      // } else {
+                      //   fromLat = 0.0;
+                      //   fromLong = 0.0;
+                      // }
+                      double toLat =
+                          12.96006; //double.parse(_endPositionLat.text);
+                      double toLong =
+                          77.75122; // double.parse(_endPositionLong.text);
+                      // if (_useCurrentLocation && (toLat == 0 || toLong == 0)) {
+                      //   AlertDialog(
+                      //       title: Text(
+                      //           "Please ensure to lat and to long values are non zero values"));
+                      // } else if (toLat == 0 ||
+                      //     toLong == 0 ||
+                      //     fromLat == 0 ||
+                      //     fromLong == 0) {
+                      //   AlertDialog(
+                      //       title: Text(
+                      //           "Please ensure lat and long values are non zero values"));
+                      // }
                       Navigator.push(
                           context,
                           MaterialPageRoute(
                               builder: (context) => MapScreen(
-                                  fromLat: fromLat,
-                                  fromLong: fromLong,
-                                  toLat: toLat,
-                                  toLong: toLong,
-                                  useMyLocation: _useCurrentLocation)));
+                                    toLat: toLat,
+                                    toLong: toLong,
+                                  )));
                     } catch (e) {
                       AlertDialog(
                           title: Text(

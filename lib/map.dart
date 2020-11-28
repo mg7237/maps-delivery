@@ -6,33 +6,27 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:driver/constant.dart';
 
 class MapScreen extends StatefulWidget {
-  final double fromLat;
-  final double fromLong;
   final double toLat;
   final double toLong;
-  final bool useMyLocation;
 
-  MapScreen(
-      {this.fromLat,
-      this.fromLong,
-      this.toLat,
-      this.toLong,
-      this.useMyLocation});
+  MapScreen({this.toLat, this.toLong});
   @override
   _MapScreenState createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
-  static const double CAMERA_ZOOM = 16;
+  static const double CAMERA_ZOOM = 15;
   static const double CAMERA_TILT = 80;
   static const double CAMERA_BEARING = 30;
+
   LatLng destLocation;
-  LatLng sourceLocation;
+  LatLng sourceLocation = LatLng(27.0858, 80.314003);
+  // Default India Lat Lang used as temporary starting point to avoid null error on page load
 
   Completer<GoogleMapController> _controller = Completer();
   Set<Marker> _markers = Set<Marker>();
 // for my drawn routes on the map
-  Set<Polyline> _polylines = Set<Polyline>();
+  Map<PolylineId, Polyline> _polylines = {};
   List<LatLng> polylineCoordinates = [];
   PolylinePoints polylinePoints;
 // for my custom marker pins
@@ -41,37 +35,54 @@ class _MapScreenState extends State<MapScreen> {
 // the user's initial location and current location
 // as it moves
   LocationData currentLocation;
+
 // a reference to the destination location
   LocationData destinationLocation;
 // wrapper around the location API
   Location location;
-  bool _useMyLocation;
 
-  @override
-  void initState() {
-    super.initState();
-    sourceLocation = LatLng(widget.fromLat, widget.fromLong);
-    destLocation = LatLng(widget.toLat, widget.toLong);
-    _useMyLocation = widget.useMyLocation;
-
+  void _startAsyncJobs() async {
     // create an instance of Location
+    location = new Location();
+    location.changeSettings(
+        accuracy: LocationAccuracy.navigation, interval: 1000);
+
+    // create instance of Destination Location
+    currentLocation = await location.getLocation();
+    // set the initial location
+
+    // create instance of Destination Location
+
+    destLocation = LatLng(widget.toLat, widget.toLong);
+
+    destinationLocation = LocationData.fromMap({
+      "latitude": destLocation.latitude,
+      "longitude": destLocation.longitude
+    });
+
+    polylinePoints = PolylinePoints();
+
     // subscribe to changes in the user's location
     // by "listening" to the location's onLocationChanged event
-    location = new Location();
-    polylinePoints = PolylinePoints();
+
     location.onLocationChanged.listen((event) {
       // event contains the lat and long of the
       // current user's position in real time,
       // so we're holding on to it
+      //sourceLocation = LatLng(event.latitude, event.longitude);
       currentLocation = event;
+      updatePinOnMap();
     });
-    updatePinOnMap();
 
     // set custom marker pins
     setSourceAndDestinationIcons();
-    // set the initial location
+  }
 
-    setInitialLocation();
+  @override
+  void initState() {
+    super.initState();
+
+    _startAsyncJobs();
   }
 
   void setSourceAndDestinationIcons() async {
@@ -81,23 +92,6 @@ class _MapScreenState extends State<MapScreen> {
     destinationIcon = await BitmapDescriptor.fromAssetImage(
         ImageConfiguration(devicePixelRatio: 2.5),
         'assets/destination_map_marker.png');
-  }
-
-  void setInitialLocation() async {
-    // set the initial location by pulling the user's
-    // current location from the location's getLocation()
-    if (_useMyLocation) {
-      currentLocation = await location.getLocation();
-    } else {
-      currentLocation = LocationData.fromMap({
-        "latitude": sourceLocation.latitude,
-        "longitude": sourceLocation.longitude
-      });
-    }
-    destinationLocation = LocationData.fromMap({
-      "latitude": destLocation.latitude,
-      "longitude": destLocation.longitude
-    });
   }
 
   void showPinsOnMap() {
@@ -131,17 +125,22 @@ class _MapScreenState extends State<MapScreen> {
           currentLocation.longitude,
         ),
         PointLatLng(
-            destinationLocation.latitude, destinationLocation.longitude));
+            destinationLocation.latitude, destinationLocation.longitude),
+        travelMode: TravelMode.driving);
     if (result.points.isNotEmpty) {
       result.points.forEach((PointLatLng point) {
         polylineCoordinates.add(LatLng(point.latitude, point.longitude));
       });
       setState(() {
-        _polylines.add(Polyline(
-            width: 5, // set the width of the polylines
-            polylineId: PolylineId('poly'),
-            color: Color(0xff287ac6),
-            points: polylineCoordinates));
+        PolylineId id = PolylineId("poly");
+        Polyline polyline = Polyline(
+            polylineId: id, color: Colors.red, points: polylineCoordinates);
+        _polylines[id] = polyline;
+        // _polylines.add(Polyline(
+        //     width: 5, // set the width of the polylines
+        //     polylineId: PolylineId('poly'),
+        //     color: Color(0xff287ac6),
+        //     points: polylineCoordinates));
       });
     }
   }
@@ -157,10 +156,11 @@ class _MapScreenState extends State<MapScreen> {
       target: LatLng(currentLocation.latitude, currentLocation.longitude),
     );
     final GoogleMapController controller = await _controller.future;
-    controller.animateCamera(CameraUpdate.newCameraPosition(cPosition));
+
     // do this inside the setState() so Flutter gets notified
     // that a widget update is due
     setState(() {
+      controller.animateCamera(CameraUpdate.newCameraPosition(cPosition));
       // updated position
       var pinPosition =
           LatLng(currentLocation.latitude, currentLocation.longitude);
@@ -175,7 +175,6 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  @override
   @override
   Widget build(BuildContext context) {
     CameraPosition initialCameraPosition = CameraPosition(
@@ -197,9 +196,10 @@ class _MapScreenState extends State<MapScreen> {
           GoogleMap(
               myLocationEnabled: true,
               compassEnabled: true,
-              tiltGesturesEnabled: false,
+              tiltGesturesEnabled: true,
               markers: _markers,
-              polylines: _polylines,
+              scrollGesturesEnabled: true,
+              polylines: Set<Polyline>.of(_polylines.values),
               mapType: MapType.normal,
               initialCameraPosition: initialCameraPosition,
               onMapCreated: (GoogleMapController controller) {
