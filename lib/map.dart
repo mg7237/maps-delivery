@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:location/location.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:driver/constant.dart';
+import 'package:driver/constants.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:driver/model.dart';
 import 'package:driver/alert_dialog.dart';
@@ -12,9 +12,9 @@ import 'dart:math';
 class MapScreen extends StatefulWidget {
   final double toLat;
   final double toLong;
-  final String uid;
+  final int tripId;
 
-  MapScreen({this.toLat, this.toLong, this.uid});
+  MapScreen({this.toLat, this.toLong, this.tripId});
   @override
   _MapScreenState createState() => _MapScreenState();
 }
@@ -48,11 +48,11 @@ class _MapScreenState extends State<MapScreen> {
 // wrapper around the location API
   Location location;
   String uid;
-  int tripId;
   ActiveDriver activeDriver;
   DriverLocation driverLocation;
   String activeDriverKey;
   String driverLocationKey;
+  int tripId;
 
   void _startAsyncJobs() async {
     // Create new entry for trip start
@@ -81,10 +81,7 @@ class _MapScreenState extends State<MapScreen> {
       // by "listening" to the location's onLocationChanged event
 
       // Create trip id
-      tripId = Random().nextInt(
-          100000); // hardcoded, this should come to app via Flutter background process so that it is synchronized between Driver and Client apps
-      activeDriver =
-          ActiveDriver(uid: widget.uid, tripId: tripId, status: "STARTED");
+      activeDriver = ActiveDriver(tripId: tripId, status: "STARTED");
 
       activeDriverKey = _database.reference().child('active_driver').push().key;
       _database
@@ -161,7 +158,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-
+    tripId = widget.tripId;
     _startAsyncJobs();
   }
 

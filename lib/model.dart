@@ -25,19 +25,17 @@ class DriverLocation {
 
 class ActiveDriver {
   String key;
-  String uid;
   String status; // Use enum, currently hardcoded to Completed or Started
   int tripId;
 
-  ActiveDriver({this.uid, this.tripId, this.status});
+  ActiveDriver({this.tripId, this.status});
 
   ActiveDriver.fromSnapshot(DataSnapshot snapshot)
       : key = snapshot.key,
-        uid = snapshot.value["uid"],
         status = snapshot.value["status"],
         tripId = snapshot.value["tripId"];
 
   toJson() {
-    return {"uid": uid, "tripID": tripId, "status": status};
+    return {"tripID": tripId, "status": status};
   }
 }
