@@ -4,12 +4,17 @@ import 'package:location/location.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:driver/constant.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:driver/model.dart';
+import 'package:driver/alert_dialog.dart';
+import 'dart:math';
 
 class MapScreen extends StatefulWidget {
   final double toLat;
   final double toLong;
+  final String uid;
 
-  MapScreen({this.toLat, this.toLong});
+  MapScreen({this.toLat, this.toLong, this.uid});
   @override
   _MapScreenState createState() => _MapScreenState();
 }
@@ -18,6 +23,8 @@ class _MapScreenState extends State<MapScreen> {
   static const double CAMERA_ZOOM = 15;
   static const double CAMERA_TILT = 80;
   static const double CAMERA_BEARING = 30;
+
+  final FirebaseDatabase _database = FirebaseDatabase.instance;
 
   LatLng destLocation;
   LatLng sourceLocation = LatLng(27.0858, 80.314003);
@@ -40,42 +47,115 @@ class _MapScreenState extends State<MapScreen> {
   LocationData destinationLocation;
 // wrapper around the location API
   Location location;
+  String uid;
+  int tripId;
+  ActiveDriver activeDriver;
+  DriverLocation driverLocation;
+  String activeDriverKey;
+  String driverLocationKey;
 
   void _startAsyncJobs() async {
-    // create an instance of Location
-    location = new Location();
-    location.changeSettings(
-        accuracy: LocationAccuracy.navigation, interval: 1000);
+    // Create new entry for trip start
+    try {
+      // create an instance of Location
+      location = new Location();
+      location.changeSettings(
+          accuracy: LocationAccuracy.navigation, interval: 1000);
 
-    // create instance of Destination Location
-    currentLocation = await location.getLocation();
-    // set the initial location
+      // create instance of Destination Location
+      currentLocation = await location.getLocation();
+      // set the initial location
 
-    // create instance of Destination Location
+      // create instance of Destination Location
 
-    destLocation = LatLng(widget.toLat, widget.toLong);
+      destLocation = LatLng(widget.toLat, widget.toLong);
 
-    destinationLocation = LocationData.fromMap({
-      "latitude": destLocation.latitude,
-      "longitude": destLocation.longitude
-    });
+      destinationLocation = LocationData.fromMap({
+        "latitude": destLocation.latitude,
+        "longitude": destLocation.longitude
+      });
 
-    polylinePoints = PolylinePoints();
+      polylinePoints = PolylinePoints();
 
-    // subscribe to changes in the user's location
-    // by "listening" to the location's onLocationChanged event
+      // subscribe to changes in the user's location
+      // by "listening" to the location's onLocationChanged event
 
-    location.onLocationChanged.listen((event) {
-      // event contains the lat and long of the
-      // current user's position in real time,
-      // so we're holding on to it
-      //sourceLocation = LatLng(event.latitude, event.longitude);
-      currentLocation = event;
-      updatePinOnMap();
-    });
+      // Create trip id
+      tripId = Random().nextInt(
+          100000); // hardcoded, this should come to app via Flutter background process so that it is synchronized between Driver and Client apps
+      activeDriver =
+          ActiveDriver(uid: widget.uid, tripId: tripId, status: "STARTED");
 
-    // set custom marker pins
-    setSourceAndDestinationIcons();
+      activeDriverKey = _database.reference().child('active_driver').push().key;
+      _database
+          .reference()
+          .child("active_driver")
+          .child(activeDriverKey)
+          .push()
+          .set(activeDriver.toJson());
+
+      driverLocationKey =
+          _database.reference().child('driver_location').push().key;
+      driverLocation = DriverLocation(
+          tripId: tripId,
+          lat: (currentLocation?.latitude),
+          long: currentLocation?.longitude);
+      _database
+          .reference()
+          .child("driver_location")
+          .child(driverLocationKey)
+          .push()
+          .set(driverLocation.toJson());
+      location.onLocationChanged.listen((event) {
+        // event contains the lat and long of the
+        // current user's position in real time,
+        // so we're holding on to it
+        //sourceLocation = LatLng(event.latitude, event.longitude);
+        currentLocation = event;
+        updatePinOnMap();
+
+        _database
+            .reference()
+            .child("driver_location")
+            .child(driverLocationKey)
+            .remove();
+
+        driverLocationKey =
+            _database.reference().child('driver_location').push().key;
+
+        driverLocation = DriverLocation(
+            tripId: tripId, lat: event.latitude, long: event.longitude);
+
+        _database
+            .reference()
+            .child("driver_location")
+            .child(driverLocationKey)
+            .push()
+            .set(driverLocation.toJson());
+
+        if (event == destinationLocation) {
+          activeDriver.status = 'COMPLETED';
+          _database
+              .reference()
+              .child("active_driver")
+              .child(activeDriverKey)
+              .set(activeDriver.toJson);
+
+          _database
+              .reference()
+              .child("driver_location")
+              .child(driverLocationKey)
+              .remove();
+        }
+      });
+
+      // set custom marker pins
+      setSourceAndDestinationIcons();
+    } catch (e) {
+      AlertDialogs alertDialogs =
+          AlertDialogs(title: "Exception", message: "${e.toString()}");
+      alertDialogs.asyncAckAlert(context);
+    }
   }
 
   @override
@@ -120,12 +200,6 @@ class _MapScreenState extends State<MapScreen> {
     // set the route lines on the map from source to destination
     // for more info follow this tutorial
     setPolylines();
-  }
-
-  @override
-  void dispose() {
-    // TODO: implement dispose
-    super.dispose();
   }
 
   void setPolylines() async {
