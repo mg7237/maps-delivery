@@ -7,7 +7,7 @@ import 'package:driver/constants.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:driver/model.dart';
 import 'package:driver/alert_dialog.dart';
-import 'dart:math';
+import 'package:driver/distance_calculator.dart';
 
 class MapScreen extends StatefulWidget {
   final double toLat;
@@ -23,11 +23,11 @@ class _MapScreenState extends State<MapScreen> {
   static const double CAMERA_ZOOM = 15;
   static const double CAMERA_TILT = 80;
   static const double CAMERA_BEARING = 30;
+  bool setCameraToStart = false;
 
   final FirebaseDatabase _database = FirebaseDatabase.instance;
 
   LatLng destLocation;
-  LatLng sourceLocation = LatLng(27.0858, 80.314003);
   // Default India Lat Lang used as temporary starting point to avoid null error on page load
 
   Completer<GoogleMapController> _controller = Completer();
@@ -53,6 +53,7 @@ class _MapScreenState extends State<MapScreen> {
   String activeDriverKey;
   String driverLocationKey;
   int tripId;
+  DistanceCalculator distanceCalculator;
 
   void _startAsyncJobs() async {
     // Create new entry for trip start
@@ -60,20 +61,14 @@ class _MapScreenState extends State<MapScreen> {
       // create an instance of Location
       location = new Location();
       location.changeSettings(
-          accuracy: LocationAccuracy.navigation, interval: 1000);
+          accuracy: LocationAccuracy.navigation, interval: 2000);
 
       // create instance of Destination Location
       currentLocation = await location.getLocation();
       // set the initial location
 
       // create instance of Destination Location
-
-      destLocation = LatLng(widget.toLat, widget.toLong);
-
-      destinationLocation = LocationData.fromMap({
-        "latitude": destLocation.latitude,
-        "longitude": destLocation.longitude
-      });
+      print(destLocation);
 
       polylinePoints = PolylinePoints();
 
@@ -109,6 +104,7 @@ class _MapScreenState extends State<MapScreen> {
         // so we're holding on to it
         //sourceLocation = LatLng(event.latitude, event.longitude);
         currentLocation = event;
+        print("Current Loc: ${event.latitude} , ${event.longitude}");
         updatePinOnMap();
 
         _database
@@ -129,8 +125,15 @@ class _MapScreenState extends State<MapScreen> {
             .child(driverLocationKey)
             .push()
             .set(driverLocation.toJson());
+        distanceCalculator = DistanceCalculator(
+            destLat: destLocation.latitude,
+            destLong: destLocation.latitude,
+            sourceLat: event.latitude,
+            sourceLong: event.longitude);
+        double totalDistanceInM = distanceCalculator.calcDistance();
 
-        if (event == destinationLocation) {
+        // If distance less than 50 (hard coding) meters then assume trip completed.
+        if (totalDistanceInM < 50) {
           activeDriver.status = 'COMPLETED';
           _database
               .reference()
@@ -159,6 +162,14 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     tripId = widget.tripId;
+    destLocation = LatLng(widget.toLat, widget.toLong);
+
+    destinationLocation = LocationData.fromMap({
+      "latitude": destLocation.latitude,
+      "longitude": destLocation.longitude
+    });
+    print(
+        "Init ${destinationLocation.latitude} , ${destinationLocation.longitude}");
     _startAsyncJobs();
   }
 
@@ -176,7 +187,12 @@ class _MapScreenState extends State<MapScreen> {
     // from the LocationData currentLocation object
 
     if (currentLocation == null || destinationLocation == null) {
-      await new Future.delayed(const Duration(seconds: 1));
+      //await new Future.delayed(const Duration(seconds: 1));
+      Timer timer = Timer.periodic(Duration(milliseconds: 500), (t) {
+        if (currentLocation != null && destinationLocation != null) {
+          t.cancel();
+        }
+      });
     }
     var pinPosition =
         LatLng(currentLocation.latitude, currentLocation.longitude);
@@ -201,33 +217,39 @@ class _MapScreenState extends State<MapScreen> {
 
   void setPolylines() async {
     polylineCoordinates = [];
-    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-        k_googleAPIKey,
-        PointLatLng(
-          currentLocation.latitude,
-          currentLocation.longitude,
-        ),
-        PointLatLng(
-            destinationLocation.latitude, destinationLocation.longitude),
-        travelMode: TravelMode.driving);
-    if (result.points.isNotEmpty) {
-      result.points.forEach((PointLatLng point) {
-        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-      });
-      if (!this.mounted) {
-        return;
+    if (currentLocation != null && destinationLocation != null) {
+      print(
+          "Destination ${destinationLocation.latitude}  , ${destinationLocation.longitude}");
+      print(
+          "Destination 2 ${currentLocation.latitude}  , ${currentLocation.longitude}");
+      PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+          k_googleAPIKey,
+          PointLatLng(
+            currentLocation.latitude,
+            currentLocation.longitude,
+          ),
+          PointLatLng(
+              destinationLocation.latitude, destinationLocation.longitude),
+          travelMode: TravelMode.driving);
+      if (result.points.isNotEmpty) {
+        result.points.forEach((PointLatLng point) {
+          polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+        });
+        if (!this.mounted) {
+          return;
+        }
+        setState(() {
+          PolylineId id = PolylineId("poly");
+          Polyline polyline = Polyline(
+              polylineId: id, color: Colors.red, points: polylineCoordinates);
+          _polylines[id] = polyline;
+          // _polylines.add(Polyline(
+          //     width: 5, // set the width of the polylines
+          //     polylineId: PolylineId('poly'),
+          //     color: Color(0xff287ac6),
+          //     points: polylineCoordinates));
+        });
       }
-      setState(() {
-        PolylineId id = PolylineId("poly");
-        Polyline polyline = Polyline(
-            polylineId: id, color: Colors.red, points: polylineCoordinates);
-        _polylines[id] = polyline;
-        // _polylines.add(Polyline(
-        //     width: 5, // set the width of the polylines
-        //     polylineId: PolylineId('poly'),
-        //     color: Color(0xff287ac6),
-        //     points: polylineCoordinates));
-      });
     }
   }
 
@@ -235,14 +257,19 @@ class _MapScreenState extends State<MapScreen> {
     // create a new CameraPosition instance
     // every time the location changes, so the camera
     // follows the pin as it moves with an animation
-    CameraPosition cPosition = CameraPosition(
-      zoom: CAMERA_ZOOM,
-      tilt: CAMERA_TILT,
-      bearing: CAMERA_BEARING,
-      target: LatLng(currentLocation.latitude, currentLocation.longitude),
-    );
-    final GoogleMapController controller = await _controller.future;
-
+    // 27.0858, 80.314003
+    if (!setCameraToStart) {
+      CameraPosition cPosition = CameraPosition(
+        zoom: CAMERA_ZOOM,
+        tilt: CAMERA_TILT,
+        bearing: CAMERA_BEARING,
+        target: LatLng(currentLocation.latitude, currentLocation.longitude),
+      );
+      final GoogleMapController controller = await _controller.future;
+      controller.animateCamera(CameraUpdate.newCameraPosition(cPosition));
+      setPolylines();
+      setCameraToStart = true;
+    }
     if (!this.mounted) {
       return;
     }
@@ -251,7 +278,6 @@ class _MapScreenState extends State<MapScreen> {
     // that a widget update is due
 
     setState(() {
-      controller.animateCamera(CameraUpdate.newCameraPosition(cPosition));
       // updated position
       var pinPosition =
           LatLng(currentLocation.latitude, currentLocation.longitude);
@@ -272,7 +298,8 @@ class _MapScreenState extends State<MapScreen> {
         zoom: CAMERA_ZOOM,
         tilt: CAMERA_TILT,
         bearing: CAMERA_BEARING,
-        target: sourceLocation);
+        target: LatLng(
+            destinationLocation.latitude, destinationLocation.longitude));
     if (currentLocation != null) {
       initialCameraPosition = CameraPosition(
           target: LatLng(currentLocation.latitude, currentLocation.longitude),
