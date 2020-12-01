@@ -21,7 +21,7 @@ class _MyHomePageState extends State<MyHomePage> {
   double toLat;
   double toLong;
   String firebaseUID;
-  int tripId = 9992889; // hard coding
+  int tripId = 25; // hard coding
 
   void checkPermission() async {
     var status = await Permission.locationWhenInUse.status;
@@ -68,7 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Google Maps APP for Drivers"),
+        title: Text("Google Maps - Start $tripId"),
       ),
       body: Padding(
         padding: const EdgeInsets.all(10.0),

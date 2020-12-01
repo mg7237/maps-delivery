@@ -21,9 +21,10 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   static const double CAMERA_ZOOM = 15;
-  static const double CAMERA_TILT = 80;
-  static const double CAMERA_BEARING = 30;
+  static const double CAMERA_TILT = 0;
+  static const double CAMERA_BEARING = 0;
   bool setCameraToStart = false;
+  Location location = Location();
 
   final FirebaseDatabase _database = FirebaseDatabase.instance;
 
@@ -46,7 +47,7 @@ class _MapScreenState extends State<MapScreen> {
 // a reference to the destination location
   LocationData destinationLocation;
 // wrapper around the location API
-  Location location;
+
   String uid;
   ActiveDriver activeDriver;
   DriverLocation driverLocation;
@@ -57,105 +58,121 @@ class _MapScreenState extends State<MapScreen> {
 
   void _startAsyncJobs() async {
     // Create new entry for trip start
-    try {
-      // create an instance of Location
-      location = new Location();
-      location.changeSettings(
-          accuracy: LocationAccuracy.navigation, interval: 2000);
+    // try {
+    // create instance of Destination Location
+    print("DESTINATION START -> $destLocation");
 
-      // create instance of Destination Location
-      currentLocation = await location.getLocation();
-      // set the initial location
+    DriverLatLong driverLatLong = await DriverLatLong().getCurrentLocation();
 
-      // create instance of Destination Location
-      print(destLocation);
+    currentLocation = LocationData.fromMap(
+        {"latitude": driverLatLong.lat, "longitude": driverLatLong.long});
 
-      polylinePoints = PolylinePoints();
+    // currentLocation =
+    //     LocationData.fromMap({"latitude": 12.8, "longitude": 77.8});
+    print("DESTINATION START AGAIN -> $destLocation");
+    // create an instance of Location
+    location.changeSettings(
+        accuracy: LocationAccuracy.navigation, interval: 2000);
 
-      // subscribe to changes in the user's location
-      // by "listening" to the location's onLocationChanged event
+    // set the initial location
 
-      // Create trip id
-      activeDriver = ActiveDriver(tripId: tripId, status: "STARTED");
+    // create instance of Destination Location
+    print("DESTINATION START -> $destLocation");
+    print("Current START -> $currentLocation");
 
-      activeDriverKey = _database.reference().child('active_driver').push().key;
+    polylinePoints = PolylinePoints();
+
+    // subscribe to changes in the user's location
+    // by "listening" to the location's onLocationChanged event
+
+    activeDriverKey = _database.reference().child('active_driver').push().key;
+
+    // Create trip id
+    activeDriver =
+        ActiveDriver(key: activeDriverKey, tripId: tripId, status: "STARTED");
+
+    _database
+        .reference()
+        .child("active_driver")
+        .child(activeDriverKey)
+        .set(activeDriver.toJson());
+
+    // driverLocationKey =
+    //     _database.reference().child('driver_location').push().key;
+    driverLocation = DriverLocation(
+        tripId: tripId,
+        lat: (currentLocation?.latitude),
+        long: (currentLocation?.longitude),
+        targetLat: (destLocation?.latitude),
+        targetLong: (destLocation?.longitude));
+    _database
+        .reference()
+        .child("driver_location")
+        .push()
+        .set(driverLocation.toJson());
+
+    location.onLocationChanged.listen((event) {
+      // event contains the lat and long of the
+      // current user's position in real time,
+      // so we're holding on to it
+      //sourceLocation = LatLng(event.latitude, event.longitude);
+      currentLocation = event;
+      print("Current Loc: ${event.latitude} , ${event.longitude}");
+      updatePinOnMap();
+
       _database
           .reference()
-          .child("active_driver")
-          .child(activeDriverKey)
-          .push()
-          .set(activeDriver.toJson());
+          .child("driver_location")
+          .child(driverLocationKey)
+          .remove();
 
       driverLocationKey =
           _database.reference().child('driver_location').push().key;
+
       driverLocation = DriverLocation(
           tripId: tripId,
-          lat: (currentLocation?.latitude),
-          long: currentLocation?.longitude);
+          lat: event.latitude,
+          long: event.longitude,
+          targetLat: destinationLocation.latitude,
+          targetLong: destinationLocation.longitude);
+
       _database
           .reference()
           .child("driver_location")
           .child(driverLocationKey)
           .push()
           .set(driverLocation.toJson());
-      location.onLocationChanged.listen((event) {
-        // event contains the lat and long of the
-        // current user's position in real time,
-        // so we're holding on to it
-        //sourceLocation = LatLng(event.latitude, event.longitude);
-        currentLocation = event;
-        print("Current Loc: ${event.latitude} , ${event.longitude}");
-        updatePinOnMap();
+      distanceCalculator = DistanceCalculator(
+          destLat: destLocation.latitude,
+          destLong: destLocation.latitude,
+          sourceLat: event.latitude,
+          sourceLong: event.longitude);
+      double totalDistanceInM = distanceCalculator.calcDistance();
+
+      // If distance less than 50 (hard coding) meters then assume trip completed.
+      if (totalDistanceInM < 50) {
+        activeDriver.status = 'COMPLETED';
+        _database
+            .reference()
+            .child("active_driver")
+            .child(activeDriverKey)
+            .set(activeDriver.toJson);
 
         _database
             .reference()
-            .child("driver_location")
+            .child("tripId")
             .child(driverLocationKey)
             .remove();
+      }
+    });
 
-        driverLocationKey =
-            _database.reference().child('driver_location').push().key;
-
-        driverLocation = DriverLocation(
-            tripId: tripId, lat: event.latitude, long: event.longitude);
-
-        _database
-            .reference()
-            .child("driver_location")
-            .child(driverLocationKey)
-            .push()
-            .set(driverLocation.toJson());
-        distanceCalculator = DistanceCalculator(
-            destLat: destLocation.latitude,
-            destLong: destLocation.latitude,
-            sourceLat: event.latitude,
-            sourceLong: event.longitude);
-        double totalDistanceInM = distanceCalculator.calcDistance();
-
-        // If distance less than 50 (hard coding) meters then assume trip completed.
-        if (totalDistanceInM < 50) {
-          activeDriver.status = 'COMPLETED';
-          _database
-              .reference()
-              .child("active_driver")
-              .child(activeDriverKey)
-              .set(activeDriver.toJson);
-
-          _database
-              .reference()
-              .child("driver_location")
-              .child(driverLocationKey)
-              .remove();
-        }
-      });
-
-      // set custom marker pins
-      setSourceAndDestinationIcons();
-    } catch (e) {
-      AlertDialogs alertDialogs =
-          AlertDialogs(title: "Exception", message: "${e.toString()}");
-      alertDialogs.asyncAckAlert(context);
-    }
+    // set custom marker pins
+    setSourceAndDestinationIcons();
+    // } catch (e) {
+    //   AlertDialogs alertDialogs =
+    //       AlertDialogs(title: "Exception", message: "${e.toString()}");
+    //   alertDialogs.asyncAckAlert(context);
+    // }
   }
 
   @override
@@ -186,13 +203,18 @@ class _MapScreenState extends State<MapScreen> {
     // get a LatLng for the source location
     // from the LocationData currentLocation object
 
-    if (currentLocation == null || destinationLocation == null) {
-      //await new Future.delayed(const Duration(seconds: 1));
-      Timer timer = Timer.periodic(Duration(milliseconds: 500), (t) {
-        if (currentLocation != null && destinationLocation != null) {
-          t.cancel();
-        }
-      });
+    if (currentLocation == null) {
+      currentLocation = await location.getLocation();
+      print("DID GET CURRENT LOC $currentLocation");
+      // await new Future.delayed(const Duration(seconds: 5));
+      // Timer timer = Timer.periodic(Duration(milliseconds: 500), (t) async {
+      //   if (currentLocation != null && destinationLocation != null) {
+      //     currentLocation = await location.getLocation();
+      //     t.cancel();
+      //   } else {
+      //     currentLocation = await location.getLocation();
+      //   }
+      // });
     }
     var pinPosition =
         LatLng(currentLocation.latitude, currentLocation.longitude);
@@ -218,10 +240,6 @@ class _MapScreenState extends State<MapScreen> {
   void setPolylines() async {
     polylineCoordinates = [];
     if (currentLocation != null && destinationLocation != null) {
-      print(
-          "Destination ${destinationLocation.latitude}  , ${destinationLocation.longitude}");
-      print(
-          "Destination 2 ${currentLocation.latitude}  , ${currentLocation.longitude}");
       PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
           k_googleAPIKey,
           PointLatLng(
@@ -232,24 +250,36 @@ class _MapScreenState extends State<MapScreen> {
               destinationLocation.latitude, destinationLocation.longitude),
           travelMode: TravelMode.driving);
       if (result.points.isNotEmpty) {
-        result.points.forEach((PointLatLng point) {
-          polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-        });
-        if (!this.mounted) {
-          return;
+        for (int i = 0; i < result.points.length; i++) {
+          if (i != (result.points.length - 1)) {
+            polylineCoordinates.add(
+                LatLng(result.points[i].latitude, result.points[i].longitude));
+          }
         }
-        setState(() {
-          PolylineId id = PolylineId("poly");
-          Polyline polyline = Polyline(
-              polylineId: id, color: Colors.red, points: polylineCoordinates);
-          _polylines[id] = polyline;
-          // _polylines.add(Polyline(
-          //     width: 5, // set the width of the polylines
-          //     polylineId: PolylineId('poly'),
-          //     color: Color(0xff287ac6),
-          //     points: polylineCoordinates));
-        });
       }
+
+      // result.points.forEach((PointLatLng point) {
+      //   if (point !=
+      //       PointLatLng(
+      //           currentLocation.latitude, currentLocation.longitude)) {
+      //     polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+      //   }
+      // }
+
+      if (!this.mounted) {
+        return;
+      }
+      setState(() {
+        PolylineId id = PolylineId("poly");
+        Polyline polyline = Polyline(
+            polylineId: id, color: Colors.red, points: polylineCoordinates);
+        _polylines[id] = polyline;
+        // _polylines.add(Polyline(
+        //     width: 5, // set the width of the polylines
+        //     polylineId: PolylineId('poly'),
+        //     color: Color(0xff287ac6),
+        //     points: polylineCoordinates));
+      });
     }
   }
 
@@ -267,12 +297,13 @@ class _MapScreenState extends State<MapScreen> {
       );
       final GoogleMapController controller = await _controller.future;
       controller.animateCamera(CameraUpdate.newCameraPosition(cPosition));
-      setPolylines();
+
       setCameraToStart = true;
     }
     if (!this.mounted) {
       return;
     }
+    setPolylines();
 
     // do this inside the setState() so Flutter gets notified
     // that a widget update is due

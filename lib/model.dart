@@ -5,20 +5,33 @@ class DriverLocation {
   int tripId;
   double lat;
   double long;
+  double targetLat;
+  double targetLong;
 
-  DriverLocation({this.tripId, this.lat, this.long});
+  DriverLocation(
+      {this.tripId,
+      this.lat,
+      this.long,
+      this.targetLat,
+      this.targetLong,
+      this.key});
 
   DriverLocation.fromSnapshot(DataSnapshot snapshot)
       : key = snapshot.key,
         tripId = snapshot.value["tripId"],
         lat = snapshot.value["lat"],
-        long = snapshot.value["long"];
+        long = snapshot.value["long"],
+        targetLat = snapshot.value["targetLat"],
+        targetLong = snapshot.value["targetLong"];
 
   toJson() {
     return {
+      "key": key,
       "tripId": tripId,
       "lat": lat,
       "long": long,
+      "targetLat": targetLat,
+      "targetLong": targetLong,
     };
   }
 }
@@ -28,7 +41,7 @@ class ActiveDriver {
   String status; // Use enum, currently hardcoded to Completed or Started
   int tripId;
 
-  ActiveDriver({this.tripId, this.status});
+  ActiveDriver({this.tripId, this.status, this.key});
 
   ActiveDriver.fromSnapshot(DataSnapshot snapshot)
       : key = snapshot.key,
@@ -36,6 +49,6 @@ class ActiveDriver {
         tripId = snapshot.value["tripId"];
 
   toJson() {
-    return {"tripID": tripId, "status": status};
+    return {"key": key, "tripID": tripId, "status": status};
   }
 }

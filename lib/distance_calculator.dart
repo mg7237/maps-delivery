@@ -1,4 +1,5 @@
 import 'package:latlong/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 class DistanceCalculator {
   double sourceLat;
@@ -16,5 +17,20 @@ class DistanceCalculator {
     final double meter = distance(
         new LatLng(sourceLat, sourceLong), new LatLng(destLat, destLong));
     return meter;
+  }
+}
+
+class DriverLatLong {
+  double lat;
+  double long;
+
+  Future<DriverLatLong> getCurrentLocation() async {
+    Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+
+    lat = position.latitude;
+    long = position.longitude;
+    return this;
+    
   }
 }
