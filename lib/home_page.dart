@@ -3,6 +3,7 @@ import 'package:driver/map.dart';
 import 'package:flutter_google_places/flutter_google_places.dart';
 import 'package:google_maps_webservice/places.dart';
 import 'package:driver/constants.dart';
+import 'package:driver/distance_calculator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:driver/alert_dialog.dart';
@@ -21,7 +22,7 @@ class _MyHomePageState extends State<MyHomePage> {
   double toLat;
   double toLong;
   String firebaseUID;
-  int tripId = 25; // hard coding
+  int tripId = 45; // hard coding
 
   void checkPermission() async {
     var status = await Permission.locationWhenInUse.status;
@@ -57,11 +58,18 @@ class _MyHomePageState extends State<MyHomePage> {
     firebaseUID = user.uid;
   }
 
+  printLocation() async {
+    DriverLatLong driverLatLong = await DriverLatLong().getCurrentLocation();
+    print(
+        "Current driver location lat - ${driverLatLong.lat} long  - ${driverLatLong.lat}");
+  }
+
   @override
   void initState() {
     super.initState();
     checkPermission();
     loginToFirebase();
+    printLocation();
   }
 
   @override
