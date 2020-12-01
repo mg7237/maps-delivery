@@ -120,14 +120,14 @@ class _MapScreenState extends State<MapScreen> {
       print("Current Loc: ${event.latitude} , ${event.longitude}");
       updatePinOnMap();
 
-      _database
-          .reference()
-          .child("driver_location")
-          .child(driverLocationKey)
-          .remove();
+      // _database
+      //     .reference()
+      //     .child("driver_location")
+      //     .child(driverLocationKey)
+      //     .remove();
 
-      driverLocationKey =
-          _database.reference().child('driver_location').push().key;
+      // driverLocationKey =
+      //     _database.reference().child('driver_location').push().key;
 
       driverLocation = DriverLocation(
           tripId: tripId,
@@ -139,7 +139,6 @@ class _MapScreenState extends State<MapScreen> {
       _database
           .reference()
           .child("driver_location")
-          .child(driverLocationKey)
           .push()
           .set(driverLocation.toJson());
       distanceCalculator = DistanceCalculator(
@@ -158,11 +157,7 @@ class _MapScreenState extends State<MapScreen> {
             .child(activeDriverKey)
             .set(activeDriver.toJson);
 
-        _database
-            .reference()
-            .child("tripId")
-            .child(driverLocationKey)
-            .remove();
+        _database.reference().child("tripId").child(driverLocationKey).remove();
       }
     });
 

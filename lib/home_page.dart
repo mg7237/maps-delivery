@@ -22,7 +22,7 @@ class _MyHomePageState extends State<MyHomePage> {
   double toLat;
   double toLong;
   String firebaseUID;
-  int tripId = 45; // hard coding
+  int tripId = 65; // hard coding
 
   void checkPermission() async {
     var status = await Permission.locationWhenInUse.status;
