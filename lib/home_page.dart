@@ -22,7 +22,10 @@ class _MyHomePageState extends State<MyHomePage> {
   double toLat;
   double toLong;
   String firebaseUID;
-  int tripId = 65; // hard coding
+  int tripId = 65;
+  double destinationLat = 19.0167;
+  double destinationLong = 73.0428;
+  // hard coding
 
   void checkPermission() async {
     var status = await Permission.locationWhenInUse.status;
@@ -74,6 +77,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => MapScreen(
+                toLat: destinationLat,
+                toLong: destinationLong,
+                tripId: tripId)));
     return Scaffold(
       appBar: AppBar(
         title: Text("Google Maps - Start $tripId"),
